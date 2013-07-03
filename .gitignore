@@ -6,3 +6,5 @@ gen/
 *.iml
 bin/
 local.properties
+.gradle/
+build/
