@@ -127,6 +127,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
                         models.add(nextIndex, newModel);
                     }
                 }
+                notifyDataSetChanged();
             }
 
             @Override
