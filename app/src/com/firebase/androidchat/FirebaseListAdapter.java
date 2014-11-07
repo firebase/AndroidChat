@@ -6,8 +6,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.Toast;
+
 import com.firebase.client.ChildEventListener;
 import com.firebase.client.DataSnapshot;
+import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
 
 import java.util.ArrayList;
@@ -61,7 +64,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
             public void onChildAdded(DataSnapshot dataSnapshot, String previousChildName) {
 
                 T model = dataSnapshot.getValue(FirebaseListAdapter.this.modelClass);
-                modelNames.put(dataSnapshot.getName(), model);
+                modelNames.put(dataSnapshot.getKey(), model);
 
                 // Insert into the correct location, based on previousChildName
                 if (previousChildName == null) {
@@ -84,7 +87,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
             public void onChildChanged(DataSnapshot dataSnapshot, String s) {
 
                 // One of the models changed. Replace it in our list and name mapping
-                String modelName = dataSnapshot.getName();
+                String modelName = dataSnapshot.getKey();
                 T oldModel = modelNames.get(modelName);
                 T newModel = dataSnapshot.getValue(FirebaseListAdapter.this.modelClass);
                 int index = models.indexOf(oldModel);
@@ -99,7 +102,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
             public void onChildRemoved(DataSnapshot dataSnapshot) {
 
                 // A model was removed from the list. Remove it from our list and the name mapping
-                String modelName = dataSnapshot.getName();
+                String modelName = dataSnapshot.getKey();
                 T oldModel = modelNames.get(modelName);
                 models.remove(oldModel);
                 modelNames.remove(modelName);
@@ -110,7 +113,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
             public void onChildMoved(DataSnapshot dataSnapshot, String previousChildName) {
 
                 // A model changed position in the list. Update our list accordingly
-                String modelName = dataSnapshot.getName();
+                String modelName = dataSnapshot.getKey();
                 T oldModel = modelNames.get(modelName);
                 T newModel = dataSnapshot.getValue(FirebaseListAdapter.this.modelClass);
                 int index = models.indexOf(oldModel);
@@ -131,9 +134,13 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
             }
 
             @Override
-            public void onCancelled() {
+            public void onCancelled(FirebaseError firebaseError) {
                 Log.e("FirebaseListAdapter", "Listen was cancelled, no more updates will occur");
+                if (firebaseError != null) {
+                    Log.e(this.getClass().getName(),firebaseError.getDetails());
+                }
             }
+
         });
     }
 
