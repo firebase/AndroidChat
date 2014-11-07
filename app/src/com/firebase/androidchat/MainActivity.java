@@ -4,12 +4,14 @@ import android.app.ListActivity;
 import android.content.SharedPreferences;
 import android.database.DataSetObserver;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.*;
 import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
 import com.firebase.client.ValueEventListener;
 
 import java.util.Random;
@@ -27,6 +29,7 @@ public class MainActivity extends ListActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Firebase.setAndroidContext(this);
         setContentView(R.layout.activity_main);
 
         // Make sure we have a username
@@ -87,9 +90,10 @@ public class MainActivity extends ListActivity {
             }
 
             @Override
-            public void onCancelled() {
-                // No-op
+            public void onCancelled(FirebaseError firebaseError) {
+                Log.d(this.getClass().getName(),"Cancelled");
             }
+
         });
     }
 
