@@ -22,7 +22,7 @@ import java.util.Random;
 public class MainActivity extends ListActivity {
 
     // TODO: change this to your own Firebase URL
-    private static final String FIREBASE_URL = "https://android-chat.firebaseio-demo.com";
+    private static final String FIREBASE_URL = "https://scorching-inferno-1140.firebaseio.com/";
 
     private String mUsername;
     private Firebase mFirebaseRef;
