@@ -113,6 +113,7 @@ public abstract class FirebaseListAdapter<T> extends BaseAdapter {
                 String modelName = dataSnapshot.getKey();
                 T oldModel = mModelKeys.get(modelName);
                 T newModel = dataSnapshot.getValue(FirebaseListAdapter.this.mModelClass);
+                mModelKeys.put(modelName, newModel);
                 int index = mModels.indexOf(oldModel);
                 mModels.remove(index);
                 if (previousChildName == null) {
