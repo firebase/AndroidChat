@@ -1,14 +1,19 @@
 package com.firebase.androidchat;
 
-import android.app.ListActivity;
+import android.app.Activity;
 import android.content.SharedPreferences;
-import android.database.DataSetObserver;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,7 +24,7 @@ import com.firebase.client.ValueEventListener;
 
 import java.util.Random;
 
-public class MainActivity extends ListActivity {
+public class MainActivity extends Activity {
 
     // TODO: change this to your own Firebase URL
     private static final String FIREBASE_URL = "https://android-chat.firebaseio-demo.com";
@@ -27,7 +32,10 @@ public class MainActivity extends ListActivity {
     private String mUsername;
     private Firebase mFirebaseRef;
     private ValueEventListener mConnectedListener;
-    private ChatListAdapter mChatListAdapter;
+
+    private RecyclerView mRecyclerView;
+    private LinearLayoutManager mLinearLayoutManager;
+    private FirebaseAdapter mAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,26 +69,28 @@ public class MainActivity extends ListActivity {
             }
         });
 
+        mRecyclerView = (RecyclerView) findViewById(R.id.chatList);
+        mLinearLayoutManager = new LinearLayoutManager(this);
+        mAdapter = new FirebaseAdapter(30, 10, 5);
+        mRecyclerView.setLayoutManager(mLinearLayoutManager);
+        mRecyclerView.setHasFixedSize(true);
+        mRecyclerView.setAdapter(mAdapter);
+        mRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (dy < 0) {
+                    mAdapter.onScrollUp();
+                }
+            }
+        });
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        // Setup our view and list adapter. Ensure it scrolls to the bottom as data changes
-        final ListView listView = getListView();
-        // Tell our list adapter that we only want 50 messages at a time
-        mChatListAdapter = new ChatListAdapter(mFirebaseRef.limit(50), this, R.layout.chat_message, mUsername);
-        listView.setAdapter(mChatListAdapter);
-        mChatListAdapter.registerDataSetObserver(new DataSetObserver() {
-            @Override
-            public void onChanged() {
-                super.onChanged();
-                listView.setSelection(mChatListAdapter.getCount() - 1);
-            }
-        });
 
-        // Finally, a little indication of connection status
-        mConnectedListener = mFirebaseRef.getRoot().child(".info/connected").addValueEventListener(new ValueEventListener() {
+        mConnectedListener = mFirebaseRef.getRoot().child(".info/connected").addValueEventListener(
+                new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 boolean connected = (Boolean) dataSnapshot.getValue();
@@ -102,7 +112,12 @@ public class MainActivity extends ListActivity {
     public void onStop() {
         super.onStop();
         mFirebaseRef.getRoot().child(".info/connected").removeEventListener(mConnectedListener);
-        mChatListAdapter.cleanup();
+    }
+
+    @Override
+    public void onDestroy() {
+        mAdapter.clean();
+        super.onDestroy();
     }
 
     private void setupUsername() {
@@ -125,6 +140,97 @@ public class MainActivity extends ListActivity {
             // Create a new, auto-generated child of that chat location, and save our chat data there
             mFirebaseRef.push().setValue(chat);
             inputText.setText("");
+        }
+    }
+
+    private static class ChatViewHolder extends RecyclerView.ViewHolder {
+        private TextView mAuthorView;
+        private TextView mMessageView;
+
+        public ChatViewHolder(View itemView) {
+            super(itemView);
+            mAuthorView = (TextView) itemView.findViewById(R.id.author);
+            mMessageView = (TextView) itemView.findViewById(R.id.message);
+        }
+
+        public void setChat(Chat chat, int color) {
+            mAuthorView.setText(chat.getAuthor()  + ": ");
+            mAuthorView.setTextColor(color);
+            mMessageView.setText(chat.getMessage());
+        }
+    }
+
+    private class FirebaseAdapter extends RecyclerView.Adapter<ChatViewHolder>
+            implements FirebaseListUtil.Listener {
+
+        private FirebaseListUtil<Chat> mFirebaseListUtil;
+        private boolean mLoading;
+        private int mInitialLoadCount;
+        private int mIncrementalLoadCount;
+        private int mPrefetchThreshold;
+
+        FirebaseAdapter(int initialLoadCount, int incrementalLoadCount, int prefetchThreshold) {
+            mInitialLoadCount = initialLoadCount;
+            mIncrementalLoadCount = incrementalLoadCount;
+            mPrefetchThreshold = prefetchThreshold;
+            HandlerThread asyncThread = new HandlerThread("AsyncThread");
+            asyncThread.start();
+            mFirebaseListUtil = new FirebaseListUtil<>(mFirebaseRef, Chat.class, new Handler(),
+                    new Handler(asyncThread.getLooper()));
+            mFirebaseListUtil.setListener(this);
+        }
+
+        @Override
+        public ChatViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(
+                    R.layout.chat_message, parent, false);
+            return new ChatViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(ChatViewHolder holder, int position) {
+            Chat chat = mFirebaseListUtil.getItem(position);
+            String author = chat.getAuthor();
+            int color = (author != null && author.equals(mUsername)) ? Color.RED : Color.BLUE;
+            holder.setChat(chat, color);
+        }
+
+        @Override
+        public int getItemCount() {
+            if (mFirebaseListUtil.getCount() == 0 && !mLoading){
+                mLoading = true;
+                mFirebaseListUtil.loadOlderEntries(mInitialLoadCount);
+            }
+
+            return mFirebaseListUtil.getCount();
+        }
+
+        @Override
+        public void onOlderEntriesLoaded(int originalEntryNum, int loadedEntryNum) {
+            mLoading = false;
+            // Old entries are always inserted in the beginning.
+            notifyItemRangeInserted(0, loadedEntryNum);
+
+            // Scroll to the the last (newest item) if this is the first load.
+            if (originalEntryNum == 0) {
+                notifyItemRangeInserted(originalEntryNum, loadedEntryNum);
+                mRecyclerView.scrollToPosition(getItemCount() - 1);
+            }
+        }
+
+        public void onScrollUp() {
+            if (!mLoading && shouldPrefetch()) {
+                mLoading = true;
+                mFirebaseListUtil.loadOlderEntries(mIncrementalLoadCount);
+            }
+        }
+
+        public void clean() {
+            mFirebaseListUtil.cleanup();
+        }
+
+        private boolean shouldPrefetch() {
+            return mLinearLayoutManager.findFirstVisibleItemPosition() < mPrefetchThreshold;
         }
     }
 }
