@@ -1,6 +1,6 @@
 package com.firebase.androidchat;
 
-import com.firebase.client.Firebase;
+import com.google.firebase.FirebaseApp;
 
 /**
  * @author Jenny Tong (mimming)
@@ -12,6 +12,6 @@ public class ChatApplication extends android.app.Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        Firebase.setAndroidContext(this);
+        //FirebaseApp.setAndroidContext(this);
     }
 }
