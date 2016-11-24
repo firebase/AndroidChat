@@ -14,6 +14,11 @@ public class Chat {
     private Chat() {
     }
 
+    @Override
+    public String toString() {
+        return message;
+    }
+
     Chat(String message, String author) {
         this.message = message;
         this.author = author;
